@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:shop_app/models/http_exception.dart';
+import 'dart:convert';
 import 'package:shop_app/providers/product.dart';
+import 'package:http/http.dart' as http;
 
 class Products with ChangeNotifier{
   List<Product> _items = [
+    /*
     Product(
       id: 'p1',
       title: 'Red Shirt',
@@ -35,7 +39,13 @@ class Products with ChangeNotifier{
       imageUrl:
       'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Cast-Iron-Pan.jpg/1024px-Cast-Iron-Pan.jpg',
     ),
+     */
   ];
+
+  final String authToken;
+  final String userId;
+
+  Products(this.authToken,this._items,this.userId);
 
   List<Product> get items{
     return [..._items]; // Return copy of _items always
@@ -49,29 +59,93 @@ class Products with ChangeNotifier{
     return _items.firstWhere((element) => id == element.id);
   }
 
-  void addProduct(Product product) {
-    final newProduct = Product(
-        id: DateTime.now().toString(),
-        title: product.title,
-        price: product.price,
-        description: product.description,
-        imageUrl: product.imageUrl
-    );
-    _items.add(newProduct);
-    notifyListeners();
+  Future<void> fetchAndSetProducts([bool filterByUser = false]) async {
+    final filter = filterByUser ? "orderBy'creatorId'&equalTo'$userId'" : "";
+    final url = "https://flutter-shop-app-5d0ca.firebaseio.com/products.json?auth=$authToken&$filter";
+    try {
+      final response = await http.get(url);
+      final extractedData = json.decode(response.body) as Map<String,dynamic>;
+      if(extractedData == null) {
+        return;
+      }
+      final favUrl = "https://flutter-shop-app-5d0ca.firebaseio.com/userFavorites/$userId.json?auth=$authToken";
+      final favoriteResponse = await http.get(favUrl);
+      final favoriteData = json.decode(favoriteResponse.body);
+      final List<Product> loadedProducts = [];
+      extractedData.forEach((productId, productData) {
+        loadedProducts.add(Product(
+          id: productId,
+          title: productData["title"],
+          description: productData["description"],
+          price: productData["price"],
+          imageUrl: productData["imageUrl"],
+          isFavorite: favoriteData == null ? false : favoriteData[productId] ?? false
+        ));
+      });
+      _items = loadedProducts;
+      notifyListeners();
+    }catch (error) {
+      throw (error);
+    }
   }
 
-  void updateProduct(String id,Product newProduct) {
+  Future<void> addProduct(Product product) async {
+    final url = "https://flutter-shop-app-5d0ca.firebaseio.com/products.json?auth=$authToken";
+    try {
+      final response = await http.post(url, body: json.encode({
+        "title": product.title,
+        "description": product.description,
+        "price": product.price,
+        "imageUrl": product.imageUrl,
+        "creatorId": userId
+      }),);
+      final newProduct = Product(
+          id: json.decode(response.body)["name"],
+          title: product.title,
+          price: product.price,
+          description: product.description,
+          imageUrl: product.imageUrl
+      );
+      _items.add(newProduct);
+      notifyListeners();
+    }catch (error) {
+        throw error;
+    }
+  }
+
+  Future<void> updateProduct(String id,Product newProduct) async {
     final productIndex = _items.indexWhere((element) => element.id == id);
     if(productIndex >= 0) {
+      final url = "https://flutter-shop-app-5d0ca.firebaseio.com/products/${id}.json?auth=$authToken";
+      await http.patch(
+          url,
+          body: json.encode({
+            "title": newProduct.title,
+            "description": newProduct.description,
+            "price": newProduct.price,
+            "imageUrl": newProduct.imageUrl,
+          })
+      );
       _items[productIndex] = newProduct;
       notifyListeners();
     }
   }
 
-  void deleteProduct(String id) {
-    _items.removeWhere((element) => id == element.id);
+  Future<void> deleteProduct(String id) async {
+    final url = "https://flutter-shop-app-5d0ca.firebaseio.com/products/${id}.json?auth=$authToken";
+    final existingProductIndex = _items.indexWhere((element) => id == element.id);
+    var existingProduct = _items[existingProductIndex];
+    _items.removeAt(existingProductIndex);
     notifyListeners();
+
+      final response = await http.delete(url);
+      if(response.statusCode >= 400) {
+        _items.insert(existingProductIndex, existingProduct);
+        notifyListeners();
+        throw HTTPException("Could not delete product");
+      }
+      existingProduct = null;
+      notifyListeners();
   }
 
 }

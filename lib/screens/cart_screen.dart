@@ -28,13 +28,7 @@ class CartScreen extends StatelessWidget {
               Chip(
                 label: Text("\$${cart.totalSum.toStringAsFixed(2)}",style: TextStyle(color: Theme.of(context).primaryColorLight),),
                 backgroundColor: Theme.of(context).primaryColor,),
-              FlatButton(
-                child: Text("Proceed to payment", style: TextStyle(color: Theme.of(context).primaryColor),),
-                onPressed: () {
-                  Provider.of<Orders>(context,listen: false).addOrder(cart.items.values.toList(), cart.totalSum);
-                  cart.clearCart();
-                },
-              )
+              OrderButton(cart: cart)
             ],
             mainAxisAlignment: MainAxisAlignment.spaceBetween,),
           ),
@@ -53,6 +47,41 @@ class CartScreen extends StatelessWidget {
           ),
         )
       ],),
+    );
+  }
+}
+
+class OrderButton extends StatefulWidget {
+  const OrderButton({
+    Key key,
+    @required this.cart,
+  }) : super(key: key);
+
+  final Cart cart;
+
+  @override
+  _OrderButtonState createState() => _OrderButtonState();
+}
+
+class _OrderButtonState extends State<OrderButton> {
+  var _isLoading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return FlatButton(
+      child: _isLoading ?
+      Center(child: CircularProgressIndicator(),) :
+      Text("Proceed to payment", style: TextStyle(color: Theme.of(context).primaryColor),),
+      onPressed: (widget.cart.totalSum <= 0 || _isLoading) ? null : () async {
+        setState(() {
+          _isLoading = true;
+        });
+        await Provider.of<Orders>(context,listen: false).addOrder(widget.cart.items.values.toList(), widget.cart.totalSum);
+        setState(() {
+          _isLoading = false;
+        });
+        widget.cart.clearCart();
+      },
     );
   }
 }

@@ -27,6 +27,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
     "price": "",
     "imageURL": "",
   };
+  var isLoading = false;
 
   @override
   void initState() {
@@ -73,7 +74,10 @@ class _EditProductScreenState extends State<EditProductScreen> {
           )
         ],
       ),
-      body: Padding(
+      body: isLoading ? Center(
+        child: CircularProgressIndicator(),
+      ) :
+      Padding(
         padding: EdgeInsets.all(15),
         child: Form(
           key: _form,
@@ -223,18 +227,44 @@ class _EditProductScreenState extends State<EditProductScreen> {
     );
   }
 
-  void _saveForm() {
+  Future<void> _saveForm() async {
     final isValid = _form.currentState.validate();
     if(!isValid) {
       return; // Error appeared while validating
     }
     _form.currentState.save();
+    setState(() {
+      isLoading = true;
+    });
+
     if(_editedProduct.id != null) {
-      Provider.of<Products>(context,listen: false).updateProduct(_editedProduct.id, _editedProduct);
+      await Provider.of<Products>(context,listen: false).updateProduct(_editedProduct.id, _editedProduct);
+      isLoading = false;
+      Navigator.of(context).pop();
     }else{
-      Provider.of<Products>(context,listen: false).addProduct(_editedProduct);
+        try {
+          await Provider.of<Products>(context,listen: false).addProduct(_editedProduct);
+        } catch (error) {
+          await showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: Text("An error occured"),
+                content: Text("Something went wrong"),
+                actions: [
+                  FlatButton(
+                    child: Text("Ok"),
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                    },
+                  )
+                ],
+              ));
+        }
+        setState(() {
+          isLoading = false;
+        });
+        Navigator.of(context).pop();
     }
-    Navigator.of(context).pop();
   }
 
   @override

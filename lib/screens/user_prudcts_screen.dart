@@ -26,22 +26,35 @@ class UserProductsScreen extends StatelessWidget {
         ],
       ),
       drawer: AppDrawer(),
-      body: Padding(
-        padding: EdgeInsets.all(8),
-        child: ListView.builder(
-          itemBuilder: (ctx, index) => Column(
-            children: [
-              UserProductItem(
-                  productsData.items[index].id,
-                  productsData.items[index].title,
-                  productsData.items[index].imageUrl
+      body: FutureBuilder(
+        future: _refreshProducts(context),
+        builder: (ctx, snapshot) =>
+          snapshot.connectionState == ConnectionState.waiting ? Center(child: CircularProgressIndicator(),) : RefreshIndicator(
+            onRefresh: () => _refreshProducts(context),
+            child: Consumer(
+              builder: (ctx, productsData, child) => Padding(
+                padding: EdgeInsets.all(8),
+                child: ListView.builder(
+                  itemBuilder: (ctx, index) => Column(
+                    children: [
+                      UserProductItem(
+                          productsData.items[index].id,
+                          productsData.items[index].title,
+                          productsData.items[index].imageUrl
+                      ),
+                      Divider(),
+                    ],
+                  ),
+                  itemCount: productsData.items.length,
+                ),
               ),
-              Divider(),
-            ],
-          ),
-          itemCount: productsData.items.length,
+            ),
         ),
       ),
     );
+  }
+
+  Future<void> _refreshProducts(BuildContext context) async {
+    await Provider.of<Products>(context, listen: false).fetchAndSetProducts(true);
   }
 }
