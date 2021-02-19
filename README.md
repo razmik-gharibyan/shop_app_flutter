@@ -1,6 +1,6 @@
 # shop_app
 
-Shop Application
+Basic shop application example using firebase cloud database
 
 ## Getting Started
 
